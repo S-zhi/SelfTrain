@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "selftrain-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["SELFTRAIN_DATA_DIR=data/preview", "npm", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "selftrain-built",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["SELFTRAIN_DATA_DIR=data/production-check", "npm", "start"],
+      "port": 8788,
+      "autoPort": true
+    }
+  ]
+}
