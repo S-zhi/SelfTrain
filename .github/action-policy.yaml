@@ -1,0 +1,8 @@
+# TypeSafe Jev evaluates model capability only. It does not execute tasks.
+reviewer:
+  name: TypeSafe
+  model: jev-latest
+  command: ["python", ".github/scripts/jev_review.py"]
+  timeout_seconds: 120
+# Add only capabilities actually supplied by a separately deployed executor.
+agents: []

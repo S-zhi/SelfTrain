@@ -24,6 +24,7 @@
 - [交给出题 Agent 的指令](docs/AGENT_PROMPT.md)
 - [30 道 Go 示例题](examples/go-syntax.jsonl)
 - [首版确认需求](docs/REQUIREMENTS.md)
+- [GitHub Issue 自动化工作流](docs/ISSUE_WORKFLOWS.md)
 - [Uiverse 组件来源和 MIT 声明](THIRD_PARTY_NOTICES.md)
 
 ## 快速开始
@@ -151,6 +152,6 @@ npm run build
 
 ## 项目与发布信息
 
-当前版本为 `0.1.0`，是一个本地新项目，尚无远程仓库、GitHub Releases 或 CI；公开贡献入口、维护者联系方式、安全披露邮箱和发布流程需要补充。对外分享前还需要选择项目自身的许可证；不要将 Uiverse 的 MIT 声明误认为整个项目已采用 MIT。
+当前版本为 `0.1.0`。仓库已配置 GitHub Issue 阶段流转、评审分配和标签同步工作流，启用步骤及执行边界见 [工作流说明](docs/ISSUE_WORKFLOWS.md)；尚未配置构建/测试 CI 或 GitHub Releases。公开贡献入口、维护者联系方式、安全披露邮箱和发布流程仍需补充。对外分享前还需要选择项目自身的许可证；不要将 Uiverse 的 MIT 声明误认为整个项目已采用 MIT。
 
 如果后续公开项目，安全问题应私下披露，不要把漏洞细节或学习备份发布到公开 Issue。
