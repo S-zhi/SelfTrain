@@ -1,6 +1,8 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { dedupeHash } from './domain/import';
+import { questionSchema } from '../shared/question';
 
 export type Db = Database.Database;
 
@@ -16,7 +18,7 @@ export function openDatabase(filePath = databasePath()): Db {
   if (filePath !== ':memory:') db.pragma('journal_mode = WAL');
 
   const version = db.pragma('user_version', { simple: true }) as number;
-  if (version > 1) {
+  if (version > 2) {
     db.close();
     throw new Error('数据库来自更新版本的 SelfTrain；请使用相应版本启动。');
   }
@@ -25,6 +27,7 @@ export function openDatabase(filePath = databasePath()): Db {
       CREATE TABLE questions (
         id TEXT PRIMARY KEY,
         content_hash TEXT NOT NULL,
+        dedupe_hash TEXT NOT NULL,
         language TEXT NOT NULL,
         topic TEXT NOT NULL,
         stem TEXT NOT NULL,
@@ -43,6 +46,7 @@ export function openDatabase(filePath = databasePath()): Db {
         last_attempt_at INTEGER
       );
       CREATE INDEX review_due ON review_state(state, due_at);
+      CREATE INDEX questions_dedupe_hash ON questions(dedupe_hash);
       CREATE TABLE sessions (
         id TEXT PRIMARY KEY,
         status TEXT NOT NULL CHECK (status IN ('active','completed','ended')),
@@ -88,8 +92,22 @@ export function openDatabase(filePath = databasePath()): Db {
         interval_hours INTEGER NOT NULL CHECK (interval_hours BETWEEN 1 AND 720)
       );
       INSERT INTO settings (id, interval_hours) VALUES (1, 24);
-      PRAGMA user_version = 1;
+      PRAGMA user_version = 2;
     `))();
+  } else if (version === 1) {
+    db.transaction(() => {
+      db.exec('ALTER TABLE questions ADD COLUMN dedupe_hash TEXT NOT NULL DEFAULT \'\';');
+      db.exec('CREATE INDEX questions_dedupe_hash ON questions(dedupe_hash); PRAGMA user_version = 2;');
+      const rows = db.prepare('SELECT id, language, topic, stem, options_json, answer, explanation, duration_seconds, tags_json, go_version FROM questions').all() as Array<Record<string, unknown>>;
+      const update = db.prepare('UPDATE questions SET dedupe_hash = ? WHERE id = ?');
+      for (const row of rows) {
+        const input = questionSchema.parse({ id: row.id, language: row.language, topic: row.topic, stem: row.stem,
+          options: JSON.parse(row.options_json as string), answer: row.answer, explanation: row.explanation,
+          duration_seconds: row.duration_seconds, tags: JSON.parse(row.tags_json as string),
+          ...(row.go_version === null ? {} : { go_version: row.go_version }) });
+        update.run(dedupeHash(input), row.id);
+      }
+    })();
   }
   return db;
 }

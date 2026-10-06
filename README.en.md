@@ -11,7 +11,7 @@ A single-user, local learning tool: import externally generated JSONL questions,
 
 ## Implemented
 
-- Atomic import of four-choice JSONL questions, up to 5,000 non-empty question lines per import (blank lines do not count); identical IDs/content are skipped and conflicts never overwrite history.
+- Atomic multi-file import of four-choice JSONL questions, up to 5,000 non-empty question lines and 5 MB per batch; duplicate content is skipped and ID conflicts reject the batch.
 - Sessions target 30 questions, shown one at a time with individual deadlines that survive reloads and tab changes.
 - Due reviews first, then random new questions; shuffled choices and answer explanations after submission.
 - Initially correct questions get one spaced review. Wrong, timed-out, or abandoned questions recur until a later correct response.
@@ -40,7 +40,15 @@ Start development mode:
 npm run dev
 ```
 
-Open **http://127.0.0.1:5173**. In the import page, import the bundled Go examples or choose your own `.jsonl` file, then start a session from the dashboard. The application UI is in Chinese.
+Open **http://127.0.0.1:5173**. In the import page, import the bundled Go examples or select/drag multiple `.jsonl` files, then start a session from the dashboard. The application UI is in Chinese.
+
+For generated questions, ask the external agent for temporary draft IDs, then assign persistent Snowflake IDs locally. Choose an unused Agent ID (0–1023) and keep using the same ignored state file:
+
+```bash
+npm run assign-ids -- --agent-id 17 --input draft.jsonl --output questions.jsonl
+```
+
+Import `questions.jsonl`. Separate state files or machines must use different Agent IDs. Do not reset the state and reuse its Agent ID.
 
 Check backend health:
 

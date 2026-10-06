@@ -41,7 +41,15 @@ npm install
 npm run dev
 ```
 
-打开 **http://127.0.0.1:5173**。在“导入题目”页点击“导入 Go 示例题”，或选择自己的 `.jsonl` 文件；回到工作台即可开始一轮。
+打开 **http://127.0.0.1:5173**。在“导入题目”页点击“导入 Go 示例题”，或多选/拖入自己的 `.jsonl` 文件；回到工作台即可开始一轮。
+
+出题 Agent 应先生成临时 ID 草稿。首次使用时选择 0–1023 范围内未被其他生成器占用的 Agent ID，并在之后持续复用仓库内自动忽略的状态文件：
+
+```sh
+npm run assign-ids -- --agent-id 17 --input draft.jsonl --output questions.jsonl
+```
+
+把 `questions.jsonl` 导入 SelfTrain。独立状态文件或不同机器必须使用不同 Agent ID；不要删除状态文件后继续复用原 Agent ID。
 
 后端健康检查：
 

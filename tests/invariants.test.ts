@@ -19,7 +19,7 @@ const fixtureMap = new Map(examples.trim().split('\n').map((line) => {
 }));
 
 function simple(id = 'one', language = 'Go') {
-  return { id, language, topic: '语法', stem: '选择正确答案', options: { A: '正确', B: '错误1', C: '错误2', D: '错误3' }, answer: 'A', explanation: '说明', duration_seconds: 2 };
+  return { id, language, topic: '语法', stem: `选择正确答案 ${id}`, options: { A: `正确 ${id}`, B: `错误1 ${id}`, C: `错误2 ${id}`, D: `错误3 ${id}` }, answer: 'A', explanation: '说明', duration_seconds: 2 };
 }
 
 describe('完整轮次与数据不变量', () => {

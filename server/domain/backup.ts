@@ -3,7 +3,7 @@ import { optionLetters } from '../../shared/choice';
 import { questionSchema } from '../../shared/question';
 import type { Db } from '../db';
 import { DomainError } from './errors';
-import { questionHash } from './import';
+import { dedupeHash, questionHash } from './import';
 
 const timestamp = z.number().int().nonnegative();
 const nullableTime = timestamp.nullable();
@@ -241,7 +241,9 @@ export function exportBackup(db: Db, now: number) {
   ensureIdle(db);
   const data = Object.fromEntries(tableOrder.map((table) => [
     table,
-    db.prepare(`SELECT * FROM ${table}`).all(),
+    db.prepare(table === 'questions'
+      ? 'SELECT id, content_hash, language, topic, stem, options_json, answer, explanation, duration_seconds, tags_json, go_version, imported_at FROM questions'
+      : `SELECT * FROM ${table}`).all(),
   ]));
   return backupSchema.parse({ format: 'selftrain-backup', version: 1, exportedAt: now, data });
 }
@@ -262,8 +264,17 @@ export function restoreBackup(db: Db, raw: unknown): void {
         for (const row of data[table]) {
           const columns = Object.keys(row);
           const placeholders = columns.map(() => '?').join(', ');
-          db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`)
-            .run(...Object.values(row));
+          if (table === 'questions') {
+            const question = row as z.infer<typeof questionRow>;
+            const input = questionSchema.parse({ id: question.id, language: question.language, topic: question.topic, stem: question.stem,
+              options: JSON.parse(question.options_json), answer: question.answer, explanation: question.explanation,
+              duration_seconds: question.duration_seconds, tags: JSON.parse(question.tags_json), ...(question.go_version === null ? {} : { go_version: question.go_version }) });
+            columns.push('dedupe_hash');
+            db.prepare(`INSERT INTO questions (${columns.join(', ')}) VALUES (${[...placeholders.split(', '), '?'].join(', ')})`)
+              .run(...Object.values(row), dedupeHash(input));
+          } else {
+            db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`).run(...Object.values(row));
+          }
         }
       }
       const problems = db.prepare('PRAGMA foreign_key_check').all();

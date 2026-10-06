@@ -1,4 +1,4 @@
-import type { ImportResult, SessionSummary, SessionView, Stats } from '../shared/api';
+import type { ImportFile, ImportResult, SessionSummary, SessionView, Stats } from '../shared/api';
 
 export class ApiRequestError extends Error {
   constructor(
@@ -32,7 +32,7 @@ async function request<T>(path: string, method: 'GET' | 'POST' | 'PUT' = 'GET', 
 
 export const api = {
   stats: () => request<Stats>('/stats'),
-  importQuestions: (jsonl: string) => request<ImportResult>('/questions/import', 'POST', { jsonl }),
+  importQuestions: (jsonl: string | ImportFile[]) => request<ImportResult>('/questions/import', 'POST', typeof jsonl === 'string' ? { jsonl } : { files: jsonl }),
   changeInterval: (intervalHours: number) => request<{ intervalHours: number }>('/settings', 'PUT', { intervalHours }),
   active: () => request<{ session: SessionView | null }>('/sessions/active/view', 'POST'),
   start: (language: string | null, topic: string | null) =>

@@ -20,7 +20,8 @@ export function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<AppError | null>(null);
   const [notice, setNotice] = useState('');
-  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importFiles, setImportFiles] = useState<File[]>([]);
+  const [draggingFiles, setDraggingFiles] = useState(false);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [intervalValue, setIntervalValue] = useState('24');
@@ -322,11 +323,16 @@ export function App() {
   }
 
   function importSelected() {
-    if (!importFile) return;
+    if (!importFiles.length) return;
     void run(async () => {
-      if (importFile.size > 5 * 1024 * 1024) throw new ApiRequestError('单个 JSONL 文件不能超过 5 MB。');
-      await importText(await importFile.text());
-      setImportFile(null);
+      const totalBytes = importFiles.reduce((total, file) => total + file.size, 0);
+      if (totalBytes > 5 * 1024 * 1024) throw new ApiRequestError('所选 JSONL 文件合计不能超过 5 MB。');
+      const files = await Promise.all(importFiles.map(async (file) => ({ name: file.name, jsonl: await file.text() })));
+      const result = await api.importQuestions(files);
+      setImportResult(result);
+      await refreshStatsAfterCommit('题目已导入，统计暂未更新。');
+      setNotice(`导入完成：新增 ${result.imported} 道，跳过相同题 ${result.skipped} 道。`);
+      setImportFiles([]);
       if (fileInput.current) fileInput.current.value = '';
     });
   }
@@ -426,11 +432,11 @@ export function App() {
           {page === 'import' && <main className="main-content form-page">
             <header className="page-heading"><span className="section-label">导入题目</span><h1>让新题进入题库。</h1><p>选择 Agent 生成的 JSONL 文件；系统检查格式后直接导入，不预览或判断答案是否正确。</p></header>
             <section className="form-section"><span className="section-label">你的文件</span><h2>批量导入 JSONL</h2><p>每行一道四选一题，必须包含时限、正确答案和解析。单次最多 5000 道题、5 MB；空行不计入题目数量。有错误则整批不导入。</p>
-              <label className="file-picker"><span>选择 .jsonl 文件</span><input ref={fileInput} type="file" accept=".jsonl,.txt,application/json,text/plain" disabled={busy} onChange={(event) => setImportFile(event.target.files?.[0] ?? null)} /><strong>{importFile?.name ?? '尚未选择文件'}</strong></label>
-              <button type="button" className="primary-button" disabled={!importFile || busy} onClick={importSelected}>导入所选文件 <span aria-hidden="true">↗</span></button>
+              <label className={`file-picker${draggingFiles ? ' is-dragging' : ''}`} onDragOver={(event) => { event.preventDefault(); if (!busy) setDraggingFiles(true); }} onDragLeave={() => setDraggingFiles(false)} onDrop={(event) => { event.preventDefault(); setDraggingFiles(false); if (!busy) setImportFiles((prior) => [...prior, ...Array.from(event.dataTransfer.files)]); }}><span>选择或拖入 .jsonl 文件（可多选）</span><input ref={fileInput} type="file" multiple accept=".jsonl,.txt,application/json,text/plain" disabled={busy} onChange={(event) => setImportFiles((prior) => [...prior, ...Array.from(event.target.files ?? [])])} /><strong>{importFiles.length ? `${importFiles.length} 个文件（${(importFiles.reduce((total, file) => total + file.size, 0) / (1024 * 1024)).toFixed(2)} MB）：${importFiles.map((file) => file.name).join('、')}` : '尚未选择文件'}</strong></label>
+              <button type="button" className="primary-button" disabled={!importFiles.length || busy} onClick={importSelected}>导入所选文件 <span aria-hidden="true">↗</span></button>
             </section>
             <section className="form-section form-secondary"><span className="section-label">先试一轮</span><h2>内置的 30 道 Go 示例题</h2><p>覆盖切片、接口、并发等常见语法。直接导入即可开始完整的一轮；再次导入相同题目不会清空历史。</p><button type="button" className="secondary-button" disabled={busy} onClick={importExample}>导入 Go 示例题</button></section>
-            {importResult && <p className="import-summary">本次处理 {importResult.total} 道：新增 {importResult.imported} 道，跳过 {importResult.skipped} 道。</p>}
+            {importResult && <div className="import-summary"><p>本次处理 {importResult.total} 道：新增 {importResult.imported} 道，跳过 {importResult.skipped} 道。</p>{(importResult.duplicates ?? []).map((item, index) => <p key={`${item.file}:${item.line}:${index}`}>{item.file} 第 {item.line} 行：{item.reason === 'id' ? `ID ${item.matchedId} 已存在` : `内容重复${item.matchedId ? `（匹配 ID ${item.matchedId}）` : `（匹配 ${item.matchedFile} 第 ${item.matchedLine} 行）`}`}，已跳过。</p>)}</div>}
           </main>}
           {page === 'settings' && <main className="main-content form-page">
             <header className="page-heading"><span className="section-label">数据与设置</span><h1>间隔可调，记录可带走。</h1><p>题库和历史保存在本机；修改间隔只影响之后产生的复现安排。</p></header>
