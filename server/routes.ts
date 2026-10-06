@@ -26,7 +26,7 @@ function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
 }
 
 export async function buildServer(db: Db, clock: () => number = Date.now) {
-  const app = Fastify({ bodyLimit: 12 * 1024 * 1024, logger: false });
+  const app = Fastify({ bodyLimit: 40 * 1024 * 1024, logger: false });
 
   app.addHook('onRequest', async (request, reply) => {
     const hostname = new URL(`http://${request.headers.host ?? 'localhost'}`).hostname;
@@ -64,8 +64,12 @@ export async function buildServer(db: Db, clock: () => number = Date.now) {
   app.get('/api/health', async () => ({ ok: true }));
   app.get('/api/stats', async () => getStats(db, clock()));
   app.post('/api/questions/import', async (request) => {
-    const { jsonl } = parseBody(z.object({ jsonl: z.string() }).strict(), request.body);
-    return importQuestions(db, jsonl, clock());
+    const schema = z.union([
+      z.object({ jsonl: z.string() }).strict(),
+      z.object({ files: z.array(z.object({ name: z.string().min(1).max(255), jsonl: z.string() }).strict()).min(1) }).strict(),
+    ]);
+    const body = parseBody(schema, request.body);
+    return importQuestions(db, 'files' in body ? body.files : body.jsonl, clock());
   });
   app.put('/api/settings', async (request) => {
     const { intervalHours } = parseBody(z.object({ intervalHours: z.number().int().min(1).max(720) }).strict(), request.body);

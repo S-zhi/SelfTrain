@@ -28,6 +28,40 @@ describe('本地 API', () => {
     return await app.inject({ method: 'POST', url, headers: { 'content-type': 'application/json' }, payload: JSON.stringify(payload) });
   }
 
+  function oneQuestion(id: string, stem = `题目 ${id}`) {
+    return JSON.stringify({ id, language: 'Go', topic: '基础', stem,
+      options: { A: '正确', B: '错误一', C: '错误二', D: '错误三' },
+      answer: 'A', explanation: '解析', duration_seconds: 30 });
+  }
+
+  it('files API 跨文件去重成功；坏文件和跨文件 5001 题上限均整批回滚并定位', async () => {
+    const same = oneQuestion('same', '规范化后相同');
+    const success = await post('/api/questions/import', { files: [
+      { name: 'first.jsonl', jsonl: `${same}\n` },
+      { name: 'second.jsonl', jsonl: oneQuestion('same-copy', '规范化后相同') },
+    ] });
+    expect(success.statusCode).toBe(200);
+    expect(success.json()).toMatchObject({ imported: 1, skipped: 1, total: 2,
+      duplicates: [{ file: 'second.jsonl', line: 1, reason: 'content', matchedFile: 'first.jsonl', matchedLine: 1 }] });
+
+    const bad = await post('/api/questions/import', { files: [
+      { name: 'good.jsonl', jsonl: oneQuestion('good') },
+      { name: 'broken.jsonl', jsonl: '{bad json' },
+    ] });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json().details[0]).toContain('broken.jsonl 第 1 行');
+    expect(db.prepare('SELECT id FROM questions ORDER BY id').all()).toEqual([{ id: 'same' }]);
+
+    const first = Array.from({ length: 2 }, (_, i) => oneQuestion(`limit-a-${i}`)).join('\n');
+    const second = Array.from({ length: 4999 }, (_, i) => oneQuestion(`limit-b-${i}`)).join('\n');
+    const overLimit = await post('/api/questions/import', { files: [
+      { name: 'part-a.jsonl', jsonl: first }, { name: 'part-b.jsonl', jsonl: second },
+    ] });
+    expect(overLimit.statusCode).toBe(400);
+    expect(overLimit.json().details[0]).toContain('part-b.jsonl 第 4999 行');
+    expect(db.prepare('SELECT id FROM questions ORDER BY id').all()).toEqual([{ id: 'same' }]);
+  });
+
   it('导入 30 道 Go 题、逐题开始计时；答前不泄露正确答案', async () => {
     const imported = await post('/api/questions/import', { jsonl });
     expect(imported.statusCode).toBe(200);

@@ -145,6 +145,35 @@ beforeEach(() => {
   api.restore.mockResolvedValue({ restored: true });
 });
 
+describe('多文件 JSONL 导入界面', () => {
+  it('多选文件后只发起一次批次提交', async () => {
+    await renderReadyApp();
+    fireEvent.click(screen.getByRole('button', { name: '导入题目' }));
+    const input = screen.getByText('选择或拖入 .jsonl 文件（可多选）').closest('label')!.querySelector('input')!;
+    const a = new File(['{}'], 'a.jsonl');
+    const b = new File(['{}'], 'b.jsonl');
+    Object.defineProperty(a, 'text', { value: async () => '{"id":"a"}' });
+    Object.defineProperty(b, 'text', { value: async () => '{"id":"b"}' });
+    fireEvent.change(input, { target: { files: [a, b] } });
+    expect(screen.getByText(/2 个文件/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '导入所选文件' }));
+    await waitFor(() => expect(api.importQuestions).toHaveBeenCalledOnce());
+    expect(api.importQuestions).toHaveBeenCalledWith([{ name: 'a.jsonl', jsonl: '{"id":"a"}' }, { name: 'b.jsonl', jsonl: '{"id":"b"}' }]);
+  });
+
+  it('拖放文件与多选共用同一批次列表', async () => {
+    await renderReadyApp();
+    fireEvent.click(screen.getByRole('button', { name: '导入题目' }));
+    const picker = screen.getByText('选择或拖入 .jsonl 文件（可多选）').closest('label')!;
+    const file = new File(['{}'], 'drop.jsonl');
+    Object.defineProperty(file, 'text', { value: async () => '{"id":"d"}' });
+    fireEvent.drop(picker, { dataTransfer: { files: [file] } });
+    expect(screen.getByText(/1 个文件/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '导入所选文件' }));
+    await waitFor(() => expect(api.importQuestions).toHaveBeenCalledWith([{ name: 'drop.jsonl', jsonl: '{"id":"d"}' }]));
+  });
+});
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

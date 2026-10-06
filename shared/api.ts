@@ -95,7 +95,9 @@ export interface ImportResult {
   imported: number;
   skipped: number;
   total: number;
+  duplicates?: Array<{ file: string; line: number; reason: 'id' | 'content'; matchedId?: string; matchedFile?: string; matchedLine?: number }>;
 }
+export interface ImportFile { name: string; jsonl: string }
 
 export interface ApiError {
   error: string;

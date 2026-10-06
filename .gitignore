@@ -1,6 +1,7 @@
 node_modules/
 dist/
 data/
+.selftrain-id-state.json*
 logs/
 .DS_Store
 .env
