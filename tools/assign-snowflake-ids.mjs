@@ -42,9 +42,12 @@ try {
   if (lastTime >= 0 && now < lastTime) throw new Error(`系统时钟回拨：当前 ${now} 早于已分配时间 ${lastTime}。请校准时钟后重试。`);
   const allocation = await allocateIds(records.length, state, agent);
   const ids = allocation.ids;
+  const output = records.map((record, index) => JSON.stringify({ ...record, id: ids[index] })).join('\n') + '\n';
+  if (Buffer.byteLength(output, 'utf8') > 5 * 1024 * 1024) {
+    throw new Error('最终 JSONL 超过 5 MB；请减少题数或内容后重试。未分配或保存这些 ID。');
+  }
   const temp = `${config}.${randomUUID()}.tmp`;
   await writeFile(temp, JSON.stringify(allocation.state, null, 2), { mode: 0o600 });
   await rename(temp, config);
-  const output = records.map((record, index) => JSON.stringify({ ...record, id: ids[index] })).join('\n') + '\n';
   await writeFile(resolve(args.output), output, { flag: 'wx' });
 } finally { await handle.close(); const { unlink } = await import('node:fs/promises'); await unlink(lock).catch(() => {}); }
